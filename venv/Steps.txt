@@ -1,6 +1,0 @@
-1. Crease VM and activate (in Windows/macOS/Linux)
-2. Install Dependencies
-3. Database Setup
-    -> Create DB.py
-    -> setup Database.py
-4. Code DB_Models
