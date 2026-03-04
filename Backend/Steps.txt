@@ -4,3 +4,12 @@
     -> Create DB.py
     -> setup Database.py
 4. Code DB_Models
+5. Code Models
+6. Code APIs
+
+{
+    "tx_date": "2026-03-04",
+    "particulars": "UPIAR/2323/DR/CHANDRAP/YESB/ddkhd",
+    "deposit": 100.00,
+    "balance": 100.00
+  }

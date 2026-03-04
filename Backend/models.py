@@ -1,60 +1,56 @@
-from pydantic import BaseModel, condecimal
+from pydantic import BaseModel, Field
 from datetime import date
-from typing import Annotated
+from typing import Optional, Annotated
+from decimal import Decimal
 
 class api_response(BaseModel):
     success: bool
     message: str
 
-class label_merchant(BaseModel):
-    particular: str
-    merchant_id: int
-
 class ignore_transaction(BaseModel):
-    transaction_ids: List[int]
+    tx_ids: list[int]
     ignore: bool
 
 class attach_category(BaseModel):
-    transaction_ids: List[int]
+    tx_ids: list[int]
     category_id: int
 
 class raw_transaction(BaseModel):
-    temp_id: int
-    date: date
+    tx_date: date
     particulars: str
-    withdrawal: Annotated[Decimal, Field(max_digits=10, decimal_places=2)]
-    deposit: Annotated[Decimal, Field(max_digits=10, decimal_places=2)]
+    withdrawal: Optional[Annotated[Decimal, Field(max_digits=10, decimal_places=2)]] = None
+    deposit: Optional[Annotated[Decimal, Field(max_digits=10, decimal_places=2)]] = None
     balance: Annotated[Decimal, Field(max_digits=10, decimal_places=2)]
 
 class transaction(BaseModel):
-    id: int
-    merchant_id: int
-    category_id: int
-    transaction_type: bool # DR: 0/CR: 1
-    description: str
-    ignore: bool
+    id: Optional[int] = None
+
+    merchant_id: Optional[int] = None
+    category_id: Optional[int] = None
+    tx_type: bool # DR: 0/CR: 1
+    ignore: Optional[bool] = False
     amount: Annotated[Decimal, Field(max_digits=10, decimal_places=2)]
-    date: date
+    tx_date: date
     openingBalance: Annotated[Decimal, Field(max_digits=10, decimal_places=2)]
     closingBalance: Annotated[Decimal, Field(max_digits=10, decimal_places=2)]
 
 class category(BaseModel):
-    id: int
-    string_id: str
+    id: Optional[int] = None
+    string_id: Optional[str] = None
     name: str
-    description: str
-    color: str
+    description: Optional[str] = None
+    color: Optional[str] = None
 
 class merchant(BaseModel):
-    id: int
+    id: Optional[int] = None
     string_id: str
     name: str
-    description: str
+    description: Optional[str] = None
     category_id: int
     ignore: bool
-    color: str
+    color: Optional[str] = None
 
 class label(BaseModel):
-    id: int
-    particular: str
+    id: Optional[int] = None
+    particulars: str
     merchant_id: int
