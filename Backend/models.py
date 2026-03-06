@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 class api_response(BaseModel):
     success: bool
     message: str
+    Warning: Optional[bool] = False
 
 
 class ignore_transaction(BaseModel):
@@ -37,29 +38,29 @@ class transaction(BaseModel):
     ignore: Optional[bool] = False
     amount: Annotated[Decimal, Field(max_digits=10, decimal_places=2)]
     tx_date: date
-    openingBalance: Annotated[Decimal, Field(max_digits=10, decimal_places=2)]
-    closingBalance: Annotated[Decimal, Field(max_digits=10, decimal_places=2)]
+    opening_balance: Annotated[Decimal, Field(max_digits=10, decimal_places=2)]
+    closing_balance: Annotated[Decimal, Field(max_digits=10, decimal_places=2)]
 
 
 class category(BaseModel):
     id: Optional[int] = None
     string_id: Optional[str] = None
-    name: str
+    name: Optional[str] = None
     description: Optional[str] = None
     color: Optional[str] = None
 
 
 class merchant(BaseModel):
     id: Optional[int] = None
-    string_id: str
-    name: str
+    string_id: Optional[str] = None
+    name: Optional[str] = None
     description: Optional[str] = None
-    category_id: int
-    ignore: bool
+    category_id: Optional[int] = None
+    ignore: Optional[bool] = False
     color: Optional[str] = None
 
 
 class label(BaseModel):
     id: Optional[int] = None
-    particulars: str
-    merchant_id: int
+    particulars: Optional[str] = None
+    merchant_id: Optional[int] = None

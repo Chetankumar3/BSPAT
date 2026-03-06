@@ -12,4 +12,4 @@
     "particulars": "UPIAR/2323/DR/CHANDRAP/YESB/ddkhd",
     "deposit": 100.00,
     "balance": 100.00
-  }
+}

@@ -1,7 +1,8 @@
 from decimal import Decimal
+from typing import Union
 
 from fastapi import Depends, FastAPI, HTTPException
-from sqlalchemy import exists, select, update
+from sqlalchemy import delete, exists, select, update
 from sqlalchemy.orm import Session
 
 import DB_models
@@ -27,8 +28,8 @@ def get_all_merchant(db: Session = Depends(get_db)):
     return db.execute(select(DB_models.merchant)).scalars().all()
 
 
-@app.get("/get_all_label", response_model=models.api_response)
-def get_all_label(data: list[models.label], db: Session = Depends(get_db)):
+@app.get("/get_all_label", response_model=list[models.label])
+def get_all_label(db: Session = Depends(get_db)):
     return db.execute(select(DB_models.label)).scalars().all()
 
 
@@ -38,8 +39,8 @@ def add_raw_transactions(data: list[models.raw_transaction], db: Session = Depen
         # Get current balance from the DB once
         last_tx = db.execute(
             select(DB_models.transaction).order_by(DB_models.transaction.id.desc())
-        ).first()
-        current_balance = last_tx.closingBalance if last_tx else Decimal("0.00")
+        ).scalars().first()
+        current_balance = last_tx.closing_balance if last_tx else Decimal("0.00")
 
         for raw_tx in data:
             parts = raw_tx.particulars.split("/")
@@ -47,16 +48,19 @@ def add_raw_transactions(data: list[models.raw_transaction], db: Session = Depen
 
             # corresponding merchant_id from "label"
             merchant_id = None
+            merchant_ignore = False
             category_id = None
             if merchant_particulars:
                 label_entry = db.execute(
                     select(DB_models.label).where(DB_models.label.particulars == merchant_particulars)
-                ).first()
+                ).scalars().first()
                 if label_entry:
-                    merchant_id = label_entry.merchant_id
                     merchant = db.execute(
-                        select(DB_models.merchant).where(DB_models.merchant.id == merchant_id)
-                    ).first()
+                        select(DB_models.merchant)
+                        .where(DB_models.merchant.id == label_entry.merchant_id)
+                    ).scalars().first()
+                    merchant_id = merchant.id
+                    merchant_ignore = merchant.ignore
                     category_id = merchant.category_id
 
             opening_balance = current_balance
@@ -73,13 +77,15 @@ def add_raw_transactions(data: list[models.raw_transaction], db: Session = Depen
 
             # Create the tx object
             new_tx = DB_models.transaction(
+                particulars=merchant_particulars,
                 tx_date=raw_tx.tx_date,
                 merchant_id=merchant_id,
                 category_id=category_id,
                 tx_type=tx_type,
+                ignore=merchant_ignore,
                 amount=amount,
-                openingBalance=opening_balance,
-                closingBalance=closing_balance,
+                opening_balance=opening_balance,
+                closing_balance=closing_balance,
             )
 
             # Insert tx object and get its id
@@ -103,37 +109,40 @@ def add_raw_transactions(data: list[models.raw_transaction], db: Session = Depen
 
     except Exception as e:
         db.rollback()  # Revert all changes
-        return models.api_response(success=False, message=f"Failed to process transactions: {str(e)}")
+        return models.api_response(success=False, message=f"Failed to processs: {str(e)}")
 
 
-@app.post("/label_merchant", response_model=models.label)
+@app.post("/label_merchant", response_model=Union[models.label, models.api_response])
 def label_merchant(data: models.label, db: Session = Depends(get_db)):
     try:
-        get_label = db.execute(
-            select(DB_models.label).where(DB_models.label.particulars == data.particulars)
-        ).first()
-
-        if get_label.merchant_id != data.merchant_id:
-            merchant = db.execute(
-                select(DB_models.merchant).where(DB_models.merchant.id == get_label.merchant_id)
-            ).first()
-            return models.api_reponse(
-                success=False,
-                message=f"Particular is already labelled to {merchant.name}",
-            )
-        elif (
-            db.execute(select(DB_models.merchant).where(DB_models.id == data.merchant_id))
-        ).row_count == 0:
-            return models.api_reponse(success=False, message="Merchant Does not Exist")
+        if not (db.execute(
+                select(exists().where(DB_models.merchant.id == data.merchant_id))
+            )).scalars().first():
+            raise HTTPException(404, "Merchant Does not Exist")
         else:
-            new_label = DB_models.label(**data.model_dump(exclude_unset=True))
-            db.add(new_label)
-            db.commit()
-            return models.api_response(success=True, message="Merchant Labelled succesfully.")
+            get_label = db.execute(
+                select(DB_models.label).where(DB_models.label.particulars == data.particulars)
+            ).scalars().first()
+
+            if not get_label:
+                new_label = DB_models.label(**data.model_dump(exclude_unset=True))
+                db.add(new_label)
+                db.commit()
+
+                return new_label
+            else:
+                db.execute(
+                    update(DB_models.label)
+                    .where(DB_models.label.id == get_label.id)
+                    .values(**get_label.model_dump(exclude="id"))
+                )
+                    
+                db.commit()
+                return get_label
 
     except Exception as e:
         db.rollback()  # Revert all changes
-        return models.api_response(success=False, message=f"Failed to process transactions: {str(e)}")
+        return models.api_response(success=False, message=f"Failed to process: {str(e)}")
 
 
 @app.put("/ignore_transaction", response_model=models.api_response)
@@ -147,10 +156,10 @@ def ignore_transaction(data: models.ignore_transaction, db: Session = Depends(ge
 
         db.commit()
         msg = ""
-        if data.tx_ids.len() == result.row_count:
+        if len(data.tx_ids) == result.rowcount:
             msg = "All Transactions updated successfully."
-        elif result.row_count > 0:
-            msg = "Partial transactions updated successfully. Transactions updated: {result.row_count}"
+        elif result.rowcount > 0:
+            msg = "Partial transactions updated successfully. Transactions updated: {result.rowcount}"
         else:
             msg = "No Transactions updated."
 
@@ -158,7 +167,7 @@ def ignore_transaction(data: models.ignore_transaction, db: Session = Depends(ge
 
     except Exception as e:
         db.rollback()
-        return models.api_response(success=False, message=f"Failed to process transactions: {str(e)}")
+        return models.api_response(success=False, message=f"Failed to processs: {str(e)}")
 
 
 @app.post("/add_category", response_model=models.api_response)
@@ -167,15 +176,19 @@ def add_category(data: models.category, db: Session = Depends(get_db)):
         new_category = DB_models.category(**data.model_dump(exclude_unset=True))
         db.add(new_category)
         db.commit()
+        return models.api_response(success=True, message="Category added successfully.")
 
     except Exception as e:
         db.rollback()  # Revert all changes
-        return models.api_response(success=False, message=f"Failed to process transactions: {str(e)}")
+        return models.api_response(success=False, message=f"Failed to processs: {str(e)}")
 
 
 @app.put("/edit_category", response_model=models.api_response)
 def edit_category(data: models.category, db: Session = Depends(get_db)):
     try:
+        if not data.id:
+            return models.api_response(success=False, message="Category id not Found")
+        
         result = db.execute(
             update(DB_models.category)
             .where(DB_models.category.id == data.id)
@@ -185,10 +198,31 @@ def edit_category(data: models.category, db: Session = Depends(get_db)):
         db.commit()
         if result.rowcount == 0:
             raise HTTPException(404, "Category id not found")
+        else:
+            return models.api_response(success=True, message="Category details updated successfully.")
 
     except Exception as e:
         db.rollback()  # Revert all changes
-        return models.api_response(success=False, message=f"Failed to process transactions: {str(e)}")
+        return models.api_response(success=False, message=f"Failed to processs: {str(e)}")
+    
+
+@app.delete("/delete_category", response_model=models.api_response)
+def delete_category(data: models.category, db: Session = Depends(get_db)):
+    try:
+        if not data.id:
+            raise HTTPException(404, "Category Not Found")
+    
+        db.execute(
+            delete(DB_models.category)
+            .where(DB_models.category.id == data.id)
+        )
+
+        db.commit()
+        return models.api_response(success=True, message="Category deleted Successfully")
+        
+    except Exception as e:
+        db.rollback()  # Revert all changes
+        return models.api_response(success=False, message=f"Failed to process: {str(e)}")
 
 
 @app.post("/add_merchant", response_model=models.api_response)
@@ -198,14 +232,18 @@ def add_merchant(data: models.merchant, db: Session = Depends(get_db)):
         db.add(new_merchant)
         db.commit()
 
+        return models.api_response(success=True, message="Merchant added successfully.")
     except Exception as e:
         db.rollback()  # Revert all changes
-        return models.api_response(success=False, message=f"Failed to process transactions: {str(e)}")
+        return models.api_response(success=False, message=f"Failed to processs: {str(e)}")
 
 
 @app.put("/edit_merchant", response_model=models.api_response)
 def edit_merchant(data: models.merchant, db: Session = Depends(get_db)):
     try:
+        if not data.id:
+            return models.api_response(success=False, message="Merchant id not Found")
+
         result = db.execute(
             update(DB_models.merchant)
             .where(DB_models.merchant.id == data.id)
@@ -215,10 +253,31 @@ def edit_merchant(data: models.merchant, db: Session = Depends(get_db)):
         db.commit()
         if result.rowcount == 0:
             raise HTTPException(404, "Merchant id not found")
-
+        else:
+            return models.api_response(success=True, message="Merchant details updated successfully.")
+        
     except Exception as e:
         db.rollback()  # Revert all changes
-        return models.api_response(success=False, message=f"Failed to process transactions: {str(e)}")
+        return models.api_response(success=False, message=f"Failed to processs: {str(e)}")
+    
+        
+@app.delete("/delete_merchant", response_model=models.api_response)
+def delete_merchant(data: models.merchant, db: Session = Depends(get_db)):
+    try:
+        if not data.id:
+            raise HTTPException(404, "Merchant Not Found")
+    
+        db.execute(
+            delete(DB_models.merchant)
+            .where(DB_models.merchant.id == data.id)
+        )
+
+        db.commit()
+        return models.api_response(success=True, message="Merchant deleted Successfully")
+        
+    except Exception as e:
+        db.rollback()  # Revert all changes
+        return models.api_response(success=False, message=f"Failed to process: {str(e)}")
 
 
 @app.put("/attach_category", response_model=models.api_response)
@@ -226,7 +285,7 @@ def attach_category(data: models.attach_category, db: Session = Depends(get_db))
     try:
         category_exists = db.execute(
             select(exists().where(DB_models.category.id == data.category_id))
-        ).scalar()
+        ).scalars().first()
 
         if not category_exists:
             raise HTTPException(404, "Category not found")
@@ -239,10 +298,10 @@ def attach_category(data: models.attach_category, db: Session = Depends(get_db))
 
         db.commit()
         msg = ""
-        if data.tx_ids.len() == result.row_count:
-            msg = "All Transactions updated successfully."
-        elif result.row_count > 0:
-            msg = "Partial transactions updated successfully. Transactions updated: {result.row_count}"
+        if len(data.tx_ids) == result.rowcount:
+            msg = f"All {len(data.tx_ids)} Transactions updated successfully."
+        elif result.rowcount > 0:
+            msg = "Partial transactions updated successfully. Transactions updated: {result.rowcount}"
         else:
             msg = "No Transactions updated."
 
@@ -250,5 +309,4 @@ def attach_category(data: models.attach_category, db: Session = Depends(get_db))
 
     except Exception as e:
         db.rollback()  # Revert all changes
-        return models.api_response(success=False, message=f"Failed to process transactions: {str(e)}")
-    pass
+        return models.api_response(success=False, message=f"Failed to process: {str(e)}")

@@ -39,7 +39,7 @@ class merchant(Base):
     string_id: Mapped[Optional[str]] = mapped_column(String(3), unique=True)
     name: Mapped[str] = mapped_column(unique=True)
     category_id: Mapped[int] = mapped_column(ForeignKey("category.id"), index=True, nullable=False)
-    ignore: Mapped[bool] = mapped_column(default=False)
+    ignore: Mapped[Optional[bool]] = mapped_column(default=False)
     description: Mapped[Optional[str]] = mapped_column(String(100))
     color: Mapped[Optional[str]] = mapped_column(String(10))
 
@@ -64,5 +64,5 @@ class transaction(Base):
     tx_type: Mapped[bool] = mapped_column()  # DR = 0/CR = 1
     ignore: Mapped[bool] = mapped_column(default=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
-    openingBalance: Mapped[Decimal] = mapped_column(Numeric(10, 2))
-    closingBalance: Mapped[Decimal] = mapped_column(Numeric(10, 2))
+    opening_balance: Mapped[Decimal] = mapped_column(Numeric(10, 2))
+    closing_balance: Mapped[Decimal] = mapped_column(Numeric(10, 2))
