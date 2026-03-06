@@ -1,11 +1,12 @@
-from decimal import Decimal
 from datetime import date
+from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Numeric, String, ForeignKey
+from sqlalchemy import ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from database import Base # Make sure 'Base' in this file is DeclarativeBase!
+from database import Base  # Make sure 'Base' in this file is DeclarativeBase!
+
 
 class raw_transaction(Base):
     __tablename__ = "raw_transaction"

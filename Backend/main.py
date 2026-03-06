@@ -1,36 +1,38 @@
-from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy import select, update
 from decimal import Decimal
 
-import models
+from fastapi import Depends, FastAPI, HTTPException
+from sqlalchemy import select, update
+from sqlalchemy.orm import Session
+
 import DB_models
-from database import get_db, engine, Base
+import models
+from database import engine, get_db
 
 DB_models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
-@app.get("/all_transaction", response_model=list[models.transaction])
-def get_all_transactions(db: Session = Depends(get_db)):
+@app.get("/get_all_transaction", response_model=list[models.transaction])
+def get_all_transaction(db: Session = Depends(get_db)):
     return db.execute(select(DB_models.transaction)).scalars().all()
 
-@app.get("/all_category", response_model=list[models.category])
-def get_all_transactions(db: Session = Depends(get_db)):
+@app.get("/get_all_category", response_model=list[models.category])
+def get_all_category(db: Session = Depends(get_db)):
     return db.execute(select(DB_models.category)).scalars().all()
 
-@app.get("/all_merchant", response_model=list[models.merchant])
-def get_all_transactions(db: Session = Depends(get_db)):
+@app.get("/get_all_merchant", response_model=list[models.merchant])
+def get_all_merchant(db: Session = Depends(get_db)):
     return db.execute(select(DB_models.merchant)).scalars().all()
 
-@app.get("/all_label", response_model=models.api_response)
-def get_all_transactions(data: list[models.label], db: Session = Depends(get_db)):
+@app.get("/get_all_label", response_model=models.api_response)
+def get_all_label(data: list[models.label], db: Session = Depends(get_db)):
     return db.execute(select(DB_models.label)).scalars().all()
 
-@app.post("/add_transaction", response_model=models.api_response)
+@app.post("/add_raw_transaction", response_model=models.api_response)
 def add_raw_transactions(data: list[models.raw_transaction], db: Session = Depends(get_db)):
     try:
         # Get current balance from the DB once
-        last_tx = db.execute(select(DB_models.transaction).order_by(DB_models.transaction.id.desc())).first()
+        last_tx = db.execute(select(DB_models.transaction)
+                             .order_by(DB_models.transaction.id.desc())).first()
         current_balance = last_tx.closingBalance if last_tx else Decimal('0.00')
 
         for raw_tx in data:
@@ -91,18 +93,18 @@ def add_raw_transactions(data: list[models.raw_transaction], db: Session = Depen
 @app.post("/label_merchant", response_model=models.label)
 def label_merchant(data: models.label, db: Session = Depends(get_db)):
     try:
-        get_label = db.execute(select(DB_models.label).where(DB.models.label.particulars == data.particulars)).first()
+        get_label = db.execute(select(DB_models.label).where(DB_models.label.particulars == data.particulars)).first()
 
         if get_label.merchant_id != data.merchant_id:
-            merchant = db.execute(select(DB_models.merchant).where(DB_models.merchant.id == get_label.merchant_id))
-            return models.api_reponse(success=False, message=f"Particular is already labelled to {get_label.merchant.name}")
-        else if !(db.execute(select(DB_models.merchant).where(DB_models.id == data.merchant_id))):
+            merchant = db.execute(select(DB_models.merchant).where(DB_models.merchant.id == get_label.merchant_id)).first()
+            return models.api_reponse(success=False, message=f"Particular is already labelled to {merchant.name}")
+        elif (db.execute(select(DB_models.merchant).where(DB_models.id == data.merchant_id))).row_count==0:
             return models.api_reponse(success=False, message="Merchant Does not Exist")
         else:
             new_label = DB_models.label(**data.model_dump(exclude_unset=True))
             db.add(new_label)
             db.commit()
-            return return models.api_response(success=True, message="Merchant Labelled succesfully.")
+            return models.api_response(success=True, message="Merchant Labelled succesfully.")
 
     except Exception as e:
         db.rollback() # Revert all changes
@@ -110,7 +112,25 @@ def label_merchant(data: models.label, db: Session = Depends(get_db)):
 
 @app.put("/ignore_transaction", response_model=models.api_response)
 def ignore_transaction(data: models.ignore_transaction, db: Session = Depends(get_db)):
-    pass
+    try:
+        result = db.execute(update(DB_models.transaction)
+        .where(DB_models.transaction.id.in_(data.tx_ids))
+        .values(ignore=data.ignore))
+
+        db.commit()
+        msg = ""
+        if data.tx_ids.len() == result.row_count:
+            msg="All Transactions updated successfully."
+        elif result.row_count > 0:
+            msg="Partial transactions updated successfully. Transactions updated: {result.row_count}"
+        else:
+            msg="No Transactions updated."
+        
+        return models.api_response(success=True, message = msg)
+
+    except Exception as e:
+        db.rollback()
+        return models.api_response(success=False, message=f"Failed to process transactions: {str(e)}")
 
 @app.post("/add_category", response_model=models.api_response)
 def add_category(data: models.category, db: Session = Depends(get_db)):

@@ -1,0 +1,14 @@
+[tool.ruff]
+# Standard for professional Python projects
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+# E = Error, F = Pyflakes, I = isort (Import sorting)
+select = ["E", "F", "I"]
+# Add "B" for bugbear if you want deeper logic checks
+extend-select = ["B"] 
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
