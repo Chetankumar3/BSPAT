@@ -20,6 +20,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # 4. Create the Base class for models to inherit from
 Base = declarative_base()
 
+
 # 5. Dependency/Helper to get a DB session
 def get_db():
     db = SessionLocal()

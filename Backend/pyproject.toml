@@ -1,6 +1,6 @@
 [tool.ruff]
 # Standard for professional Python projects
-line-length = 88
+line-length = 105
 target-version = "py312"
 
 [tool.ruff.lint]
@@ -8,6 +8,8 @@ target-version = "py312"
 select = ["E", "F", "I"]
 # Add "B" for bugbear if you want deeper logic checks
 extend-select = ["B"] 
+# B008: Do not perform function call in argument defaults
+extend-ignore = ["B008"]
 
 [tool.ruff.format]
 quote-style = "double"
