@@ -37,9 +37,11 @@ def get_all_label(db: Session = Depends(get_db)):
 def add_raw_transactions(data: list[models.raw_transaction], db: Session = Depends(get_db)):
     try:
         # Get current balance from the DB once
-        last_tx = db.execute(
-            select(DB_models.transaction).order_by(DB_models.transaction.id.desc())
-        ).scalars().first()
+        last_tx = (
+            db.execute(select(DB_models.transaction).order_by(DB_models.transaction.id.desc()))
+            .scalars()
+            .first()
+        )
         current_balance = last_tx.closing_balance if last_tx else Decimal("0.00")
 
         for raw_tx in data:
@@ -51,14 +53,25 @@ def add_raw_transactions(data: list[models.raw_transaction], db: Session = Depen
             merchant_ignore = False
             category_id = None
             if merchant_particulars:
-                label_entry = db.execute(
-                    select(DB_models.label).where(DB_models.label.particulars == merchant_particulars)
-                ).scalars().first()
+                label_entry = (
+                    db.execute(
+                        select(DB_models.label).where(
+                            DB_models.label.particulars == merchant_particulars
+                        )
+                    )
+                    .scalars()
+                    .first()
+                )
                 if label_entry:
-                    merchant = db.execute(
-                        select(DB_models.merchant)
-                        .where(DB_models.merchant.id == label_entry.merchant_id)
-                    ).scalars().first()
+                    merchant = (
+                        db.execute(
+                            select(DB_models.merchant).where(
+                                DB_models.merchant.id == label_entry.merchant_id
+                            )
+                        )
+                        .scalars()
+                        .first()
+                    )
                     merchant_id = merchant.id
                     merchant_ignore = merchant.ignore
                     category_id = merchant.category_id
@@ -115,14 +128,20 @@ def add_raw_transactions(data: list[models.raw_transaction], db: Session = Depen
 @app.post("/label_merchant", response_model=Union[models.label, models.api_response])
 def label_merchant(data: models.label, db: Session = Depends(get_db)):
     try:
-        if not (db.execute(
-                select(exists().where(DB_models.merchant.id == data.merchant_id))
-            )).scalars().first():
+        if (
+            not (db.execute(select(exists().where(DB_models.merchant.id == data.merchant_id))))
+            .scalars()
+            .first()
+        ):
             raise HTTPException(404, "Merchant Does not Exist")
         else:
-            get_label = db.execute(
-                select(DB_models.label).where(DB_models.label.particulars == data.particulars)
-            ).scalars().first()
+            get_label = (
+                db.execute(
+                    select(DB_models.label).where(DB_models.label.particulars == data.particulars)
+                )
+                .scalars()
+                .first()
+            )
 
             if not get_label:
                 new_label = DB_models.label(**data.model_dump(exclude_unset=True))
@@ -136,7 +155,7 @@ def label_merchant(data: models.label, db: Session = Depends(get_db)):
                     .where(DB_models.label.id == get_label.id)
                     .values(**get_label.model_dump(exclude="id"))
                 )
-                    
+
                 db.commit()
                 return get_label
 
@@ -188,7 +207,7 @@ def edit_category(data: models.category, db: Session = Depends(get_db)):
     try:
         if not data.id:
             return models.api_response(success=False, message="Category id not Found")
-        
+
         result = db.execute(
             update(DB_models.category)
             .where(DB_models.category.id == data.id)
@@ -204,22 +223,19 @@ def edit_category(data: models.category, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()  # Revert all changes
         return models.api_response(success=False, message=f"Failed to processs: {str(e)}")
-    
+
 
 @app.delete("/delete_category", response_model=models.api_response)
 def delete_category(data: models.category, db: Session = Depends(get_db)):
     try:
         if not data.id:
             raise HTTPException(404, "Category Not Found")
-    
-        db.execute(
-            delete(DB_models.category)
-            .where(DB_models.category.id == data.id)
-        )
+
+        db.execute(delete(DB_models.category).where(DB_models.category.id == data.id))
 
         db.commit()
         return models.api_response(success=True, message="Category deleted Successfully")
-        
+
     except Exception as e:
         db.rollback()  # Revert all changes
         return models.api_response(success=False, message=f"Failed to process: {str(e)}")
@@ -255,26 +271,23 @@ def edit_merchant(data: models.merchant, db: Session = Depends(get_db)):
             raise HTTPException(404, "Merchant id not found")
         else:
             return models.api_response(success=True, message="Merchant details updated successfully.")
-        
+
     except Exception as e:
         db.rollback()  # Revert all changes
         return models.api_response(success=False, message=f"Failed to processs: {str(e)}")
-    
-        
+
+
 @app.delete("/delete_merchant", response_model=models.api_response)
 def delete_merchant(data: models.merchant, db: Session = Depends(get_db)):
     try:
         if not data.id:
             raise HTTPException(404, "Merchant Not Found")
-    
-        db.execute(
-            delete(DB_models.merchant)
-            .where(DB_models.merchant.id == data.id)
-        )
+
+        db.execute(delete(DB_models.merchant).where(DB_models.merchant.id == data.id))
 
         db.commit()
         return models.api_response(success=True, message="Merchant deleted Successfully")
-        
+
     except Exception as e:
         db.rollback()  # Revert all changes
         return models.api_response(success=False, message=f"Failed to process: {str(e)}")
@@ -283,9 +296,11 @@ def delete_merchant(data: models.merchant, db: Session = Depends(get_db)):
 @app.put("/attach_category", response_model=models.api_response)
 def attach_category(data: models.attach_category, db: Session = Depends(get_db)):
     try:
-        category_exists = db.execute(
-            select(exists().where(DB_models.category.id == data.category_id))
-        ).scalars().first()
+        category_exists = (
+            db.execute(select(exists().where(DB_models.category.id == data.category_id)))
+            .scalars()
+            .first()
+        )
 
         if not category_exists:
             raise HTTPException(404, "Category not found")
