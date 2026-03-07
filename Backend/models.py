@@ -32,6 +32,7 @@ class raw_transaction(BaseModel):
 class transaction(BaseModel):
     id: Optional[int] = None
 
+    particulars: Optional[str] = None
     merchant_id: Optional[int] = None
     category_id: Optional[int] = None
     tx_type: bool  # DR: 0/CR: 1

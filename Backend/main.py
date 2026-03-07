@@ -2,6 +2,7 @@ from decimal import Decimal
 from typing import Union
 
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import delete, exists, select, update
 from sqlalchemy.orm import Session
 
@@ -12,6 +13,18 @@ from database import engine, get_db
 DB_models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
+origins = [
+    "http://localhost:5173/",
+    "http://localhost:3000/"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 
 @app.get("/get_all_transaction", response_model=list[models.transaction])
 def get_all_transaction(db: Session = Depends(get_db)):

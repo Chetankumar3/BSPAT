@@ -13,3 +13,14 @@
     "deposit": 100.00,
     "balance": 100.00
 }
+
+{
+    Perfect.  Do the following now:
+
+    1. Switch to Tailwind CSS.
+    2. Do some structuring of the files and make the code readable and maintainable, like the industry standards.
+    3. Give custom date filters and 1 month, 3 months, 6 months, 1yr, 2yr windows in graphs.
+    4. Similar to the 3rd point add multiple filterings, and also sortings in transaction. 
+        Also, paginate the trnsactions (with custom page access)
+    5. Give option to upload CSV and use add_raw_transaction to add these transactions.
+}
